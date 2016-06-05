@@ -73,9 +73,9 @@ module.exports = {
   },
   bearychat:{
     incoming:{
-      url:"https://hook.bearychat.com/=bw8fe/incoming/0249756f9b5d2df8429845794486acf0"
+      url:"https://hook.bearychat.com/xxxxx" //yours incoming bot url
     },
-    appTestChannel:"监听者",
+    appTestChannel:"xxx",//yours bearychat channel name
 
   },
 
