@@ -9,6 +9,7 @@ module.exports = {
     return new Promise(async(s, f) => {
       try{
         var idR = await redisConn.hgetall(config.redisPrefix.hash.userById+id);
+        logger.info(idR)
       }catch(e){
         logger.error(e);
         f(
@@ -28,6 +29,7 @@ module.exports = {
       if(common.isEmptyObject(idR)){
         try{
           var idFromAccount = await redisConn.get(config.redisPrefix.string.userByAccount+id);
+          logger.info(idFromAccount)
         }catch(e){
           logger.error(e);
           f(
