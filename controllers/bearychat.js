@@ -125,7 +125,7 @@ module.exports = {
       }
 
       for(let i = 0;i<channelList.length;i++){
-        text += channelList[i].name+"("+channelList[i].alias+")\n";
+        text += i+"."+channelList[i].name+"("+channelList[i].alias+")\n";
       }
 
       ctx.body = {
@@ -162,7 +162,7 @@ module.exports = {
         text = "你当前还没有订阅主题";
       }
       for(let i = 0;i<channelList.length;i++){
-        text += channelList[i].name+"("+channelList[i].alias+")\n";
+        text += i+"."+channelList[i].name+"("+channelList[i].alias+")\n";
       }
       ctx.body = {
         text: text
@@ -195,7 +195,7 @@ module.exports = {
         text = '目前还没有收到消息';
       }
       for(let i = 0;i<messageList.length;i++){
-        text += messageList[i].channel.name+":"+messageList[i].text+"\n";
+        text += i+"."+messageList[i].channel.name+":"+messageList[i].text+"\n";
       }
 
 
