@@ -9,7 +9,6 @@ module.exports = {
     const bearychatUserName = ctx.checkBody('user_name').notEmpty().value;
     const text = ctx.checkBody('text').notEmpty().value;
     const triggerWord = ctx.checkBody('trigger_word').notEmpty().value;
-    logger.info(triggerWord)
     if (ctx.errors) {
       logger.warn(ctx.errors);
       ctx.status = 422;
@@ -19,6 +18,7 @@ module.exports = {
       return;
     }
     const account = bearychatChannelName + "_" + bearychatUserName;
+    logger.info(account)
     let user;
     try {
       user = await userLib.getOneUser(account);
