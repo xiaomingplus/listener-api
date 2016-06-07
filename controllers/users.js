@@ -4,18 +4,22 @@ const config = require('../config');
 const date = require('../utils/date');
 const common = require('../utils/common');
 const uuid = require('node-uuid');
+const usersLib = require('../libs/user');
 const logger = require('koa-log4').getLogger('Users');
+const timeline = require('../libs/timeline');
 const users = {
 
 };
 
 users.postUsers = async (ctx) => {
   const name = ctx.checkBody('name').notEmpty().value;
-  const tel = ctx.checkBody('tel').notEmpty().isInt().len(11,11).value;
+  const account = ctx.checkBody('account').notEmpty().value;
+  const token = ctx.checkBody('token').notEmpty().value;
   const avatar = ctx.checkBody('avatar').notEmpty().isUrl().value;
   const educations = ctx.checkBody('educations').optional().default([]).value;
-  const city_id = ctx.checkBody('city_id').notEmpty().value;
+  const city = ctx.checkBody('city').optional().value;
   const device = ctx.checkBody('device').optional().value;
+  const type = ctx.checkBody('type').notEmpty().value;
   //todo 检测学校和城市 是否存在以及是否符合规范
   if(educations && !Array.isArray(educations)){
     logger.warn(ctx.errors);
@@ -28,7 +32,10 @@ users.postUsers = async (ctx) => {
         }
       ]
     };
+    return;
   }
+
+
 
   if(ctx.errors){
     logger.warn(ctx.errors);
@@ -39,8 +46,32 @@ users.postUsers = async (ctx) => {
     };
     return;
   }else{
+
+    if(type === 'phone'){
+
+    }else if(type === 'wechat'){
+
+    }else if(type === 'bearychat'){
+
+      // pass
+
+    }else{
+      logger.warn(ctx.errors);
+      ctx.status=422;
+      ctx.body = {
+        ...config.errors.invalid_params,
+        errors:[
+          {
+            tags:'this login type is not support now'
+          }
+        ]
+      };
+      return;
+    }
+
+
     try{
-      var r =  await redisConn.exists(config.redisPrefix.string.userByTel+tel);
+      var r =  await redisConn.exists(config.redisPrefix.string.userByAccount+account);
     }catch(e){
       logger.error(e);
       ctx.status = 500;
@@ -58,7 +89,7 @@ users.postUsers = async (ctx) => {
       ctx.body = {
         ...config.errors.conflict,
         errors:[
-          "该手机号码已存在"
+          "该账户已存在"
         ]
       };
       return;
@@ -66,14 +97,18 @@ users.postUsers = async (ctx) => {
     const id = uuid.v4();
     const item = {
       id,
-      tel,
+      account,
       name,
       avatar,
+      type,
       created:date.time(),
       updated:date.time()
     };
     if(educations){
       item.educations = JSON.stringify(educations);
+    }
+    if(city){
+      item.city = city;
     }
 
     if(device && !common.isEmptyObject(device) && device.type && device.id ){
@@ -100,17 +135,19 @@ users.postUsers = async (ctx) => {
     }
     const promiseArr = [
      redisConn.hmset(config.redisPrefix.hash.userById+id,item),
-     redisConn.set(config.redisPrefix.string.userByTel+tel,id),
+     redisConn.set(config.redisPrefix.string.userByAccount+account,id),
      redisConn.lpush(config.redisPrefix.list.allUser,id),
-     redisConn.lpush(config.redisPrefix.list.cityUserById+city_id,id)
+     redisConn.lpush(config.redisPrefix.list.cityUserById+city,id)
  ];
 
-
+     if(city){
+       promiseArr.push(redisConn.lpush(config.redisPrefix.list.cityUserById+city,id));
+     }
     for(let i=0;i<educations.length;i++){
-      if(educations[i].school_id){
-        promiseArr.push(redisConn.lpush(config.redisPrefix.list.schoolUserById+educations[i].school_id,id));
-        if(educations[i].college_id){
-          promiseArr.push(redisConn.lpush(config.redisPrefix.common.user+config.redisPrefix.common.school+educations[i].school_id+educations[i].school_id+":"+config.redisPrefix.common.college+educations[i].college_id,id));
+      if(educations[i].school){
+        promiseArr.push(redisConn.lpush(config.redisPrefix.list.schoolUserById+educations[i].school,id));
+        if(educations[i].college){
+          promiseArr.push(redisConn.lpush(config.redisPrefix.common.user+config.redisPrefix.common.school+educations[i].school+educations[i].school+":"+config.redisPrefix.common.college+educations[i].college,id));
         }
       }
     }
@@ -132,6 +169,12 @@ users.postUsers = async (ctx) => {
 
     ctx.status = 201;
     ctx.body = item;
+
+    timeline.postChannelForNewUser({
+      educations:educations,
+      city:city,
+      userId:id
+    })
   }
 };
 
@@ -148,76 +191,172 @@ users.getOneUser = async (ctx) => {
         errors:ctx.errors
       };
     }else{
-
       try{
-        var idR = await redisConn.hgetall(config.redisPrefix.hash.userById+id);
+      var result = await usersLib.getOneUser(id);
       }catch(e){
-        logger.error(e);
-        ctx.status = 500;
-        ctx.body = {
-          ...config.errors.internal_server_error,
-          errors:[
-            e
-          ]
-        };
+        logger.error(e)
+        ctx.status = e.status;
+        ctx.body = e.body;
         return;
-
       }
-      if(common.isEmptyObject(idR)){
-        try{
-          var idFromTel = await redisConn.get(config.redisPrefix.string.userByTel+id);
-        }catch(e){
-          logger.error(e);
-          ctx.status = 500;
-          ctx.body = {
-            ...config.errors.internal_server_error,
-            errors:[
-              e
-            ]
-          };
-          return;
-
-        }
-
-        if(idFromTel===null){
-
-
-
-            ctx.status = 404;
-            ctx.body = {
-              ...config.errors.not_found,
-              errors:[
-                "没有找到该主题"
-              ]
-            }
-            return;
-
-        }else{
-
-          try{
-            var telR = await redisConn.hgetall(config.redisPrefix.hash.userById+idFromTel);
-          }catch(e){
-            logger.error(e);
-            ctx.status = 500;
-            ctx.body = {
-              ...config.errors.internal_server_error,
-              errors:[
-                e
-              ]
-            };
-            return;
-
-          }
-
-          ctx.body = telR;
-        }
-      }else{
-        ctx.body = idR;
-      }
-
-
-
+      ctx.body = result;
+      return;
     }
 };
+
+users.getUnsubscriptions = async (ctx) => {
+    const userId = ctx.checkParams('id').notEmpty().isUUID(null,4).value;
+    const start = ctx.checkQuery('start').optional().default(0).toInt().ge(0).value;
+    const limit = ctx.checkQuery('limit').optional().default(config.defaultParams.listLength).toInt().gt(0).le(config.defaultParams.listMaxLength).value;
+    if(ctx.errors){
+      logger.warn(ctx.errors);
+      ctx.status=422;
+      ctx.body = {
+        ...config.errors.invalid_params,
+        errors:ctx.errors
+      };
+      return;
+    }
+
+    const stop = start+limit-1;
+    try{
+      var idsR = await redisConn.zrevrange(config.redisPrefix.sortedSet.userUnsubscribedChannelById+userId,start,stop);
+    }catch(e){
+      logger.error(e);
+      ctx.status = 500;
+      ctx.body = {
+        ...config.errors.internal_server_error,
+        errors:[
+          e
+        ]
+      };
+      return;
+
+    }
+    const ids = [];
+    for (let i=0;i<idsR.length;i++){
+      ids.push(config.redisPrefix.hash.channelById+idsR[i]);
+    }
+    try{
+      var result =await redis.mhgetall(ids);
+    }catch(e){
+      logger.error(e);
+      ctx.status = 500;
+      ctx.body = {
+        ...config.errors.internal_server_error,
+        errors:[
+          e
+        ]
+      };
+      return;
+
+    }
+    ctx.body = {
+      channels:result
+    }
+
+}
+
+users.getFollowings = async (ctx) => {
+  const userId = ctx.checkParams('id').notEmpty().isUUID(null,4).value;
+  const start = ctx.checkQuery('start').optional().default(0).toInt().ge(0).value;
+  const limit = ctx.checkQuery('limit').optional().default(config.defaultParams.listLength).toInt().gt(0).le(config.defaultParams.listMaxLength).value;
+  if(ctx.errors){
+    logger.warn(ctx.errors);
+    ctx.status=422;
+    ctx.body = {
+      ...config.errors.invalid_params,
+      errors:ctx.errors
+    };
+    return;
+  }
+  const stop = start+limit-1;
+  try{
+    var idsR = await redisConn.zrevrange(config.redisPrefix.sortedSet.userFollowingByUserId+userId,start,stop);
+  }catch(e){
+    logger.error(e);
+    ctx.status = 500;
+    ctx.body = {
+      ...config.errors.internal_server_error,
+      errors:[
+        e
+      ]
+    };
+    return;
+
+  }
+  const ids = [];
+  for (let i=0;i<idsR.length;i++){
+    ids.push(config.redisPrefix.hash.channelById+idsR[i]);
+  }
+  try{
+    var result =await redis.mhgetall(ids);
+  }catch(e){
+    logger.error(e);
+    ctx.status = 500;
+    ctx.body = {
+      ...config.errors.internal_server_error,
+      errors:[
+        e
+      ]
+    };
+    return;
+
+  }
+  ctx.body = {
+    channels:result
+  }
+
+}
+
+users.getMessages = async (ctx) => {
+  const userId = ctx.checkParams('id').notEmpty().isUUID(null,4).value;
+  const start = ctx.checkQuery('start').optional().default(0).toInt().ge(0).value;
+  const limit = ctx.checkQuery('limit').optional().default(config.defaultParams.listLength).toInt().gt(0).le(config.defaultParams.listMaxLength).value;
+  if(ctx.errors){
+    logger.warn(ctx.errors);
+    ctx.status=422;
+    ctx.body = {
+      ...config.errors.invalid_params,
+      errors:ctx.errors
+    };
+    return;
+  }
+  const stop = start+limit-1;
+  try{
+    var idsR = await redisConn.lrange(config.redisPrefix.list.userMessagesById+userId,start,stop);
+  }catch(e){
+    logger.error(e);
+    ctx.status = 500;
+    ctx.body = {
+      ...config.errors.internal_server_error,
+      errors:[
+        e
+      ]
+    };
+    return;
+
+  }
+  const ids = [];
+  for (let i=0;i<idsR.length;i++){
+    ids.push(config.redisPrefix.string.messageById+idsR[i]);
+  }
+  try{
+    var result =await redis.mgetalljson(ids);
+  }catch(e){
+    logger.error(e);
+    ctx.status = 500;
+    ctx.body = {
+      ...config.errors.internal_server_error,
+      errors:[
+        e
+      ]
+    };
+    return;
+  }
+  ctx.body = {
+    messages:result
+  }
+}
 
 module.exports = users;

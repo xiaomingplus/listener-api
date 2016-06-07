@@ -10,7 +10,6 @@ const schools = require('./controllers/schools');
 const channels = require('./controllers/channels');
 const users = require('./controllers/users');
 const messages = require('./controllers/messages');
-const subscriptions = require('./controllers/subscriptions');
 const bearychat = require('./controllers/bearychat');
 const redisConn = require('./utils/redisConn');
 log4js.configure({
@@ -69,17 +68,18 @@ router.post('/schools',schools.postSchools);
 router.get('/schools',schools.getSchools);
 router.get('/schools/:id',schools.getOneSchool);
 router.post('/channels',channels.postChannels);
-router.get('/channels',channels.getChannels);
 router.get('/channels/:id',channels.getOneChannel);
+router.get('/channels/:id/messages',channels.getMessages);
+router.post('/channels/:id/following',channels.postFollowing);
+router.post('/channels/:id/messages',channels.postMessages);
 router.post('/users',users.postUsers);
 router.get('/users/:id',users.getOneUser);
-router.post('/subscriptions',subscriptions.postSubscriptions);
-router.get('/subscriptions',subscriptions.getSubscriptions);
-router.get('/subscriptions/:id',subscriptions.getOneSubscription);
-router.post('/messages',messages.postMessages);
+router.get('/users/:id/timeline',users.getUnsubscriptions);
+router.get('/users/:id/channels',users.getFollowings);
+router.get('/users/:id/messages',users.getMessages);
 router.get('/messages/:id',messages.getOneMessage);
 
-router.post('/bearychat/subscriptions',bearychat.receiveSubscription);
+router.post('/bearychat',bearychat.receive);
 app.use(router.routes())
 .use(router.allowedMethods({
   throw:true
