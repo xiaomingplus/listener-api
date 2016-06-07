@@ -77,10 +77,11 @@ module.exports = {
             return;
 
           }
-
+          logger.info(accountR)
           s(accountR);
         }
       }else{
+        logger.info(idR)
         s(idR);
       }
     });
