@@ -158,6 +158,9 @@ module.exports = {
 
       const channelList = data.channels;
       let text = "你已订阅的主题有：\n";
+      if(channelList.length===0){
+        text = "你当前还没有订阅主题";
+      }
       for(let i = 0;i<channelList.length;i++){
         text += channelList[i].name+"("+channelList[i].alias+")\n";
       }
