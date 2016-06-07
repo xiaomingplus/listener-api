@@ -190,13 +190,14 @@ module.exports = {
         return;
       }
       const messageList = data.messages;
-      let text = "";
+      let text = "你的消息列表\n";
+      if(messageList.length===0){
+        text = '目前还没有收到消息';
+      }
       for(let i = 0;i<messageList.length;i++){
         text += messageList[i].channel.name+":"+messageList[i].text+"\n";
       }
-      if(!text){
-        text = '目前还没有收到消息';
-      }
+
 
       ctx.body = {
         text: text
