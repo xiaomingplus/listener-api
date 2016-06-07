@@ -3,6 +3,8 @@ module.exports = {
     listLength:15,
     listMaxLength:50
   },
+  localApiUrl:"http://127.0.0.1:3000",
+  remoteApiUrl:"http://api.jiantingzhe.com",
   redisConfig:{
     port: 6379,          // Redis port
     host: '127.0.0.1',   // Redis host
@@ -33,7 +35,7 @@ module.exports = {
 
       channelByAlias:"channel:alias:",
 
-      userByTel:"user:tel:"
+      userByAccount:"user:account:"
     },
     hash:{
       schoolById:"school:id:",
@@ -51,15 +53,15 @@ module.exports = {
       userFollowingByUserId:"following:user:",
       channelFollowerByChannelId:"follower:channel:",
       userUnreadMessageByUserId:"message:unread:user:",
-      userReadMessageByUserId:"message:read:user:"
-
+      userReadMessageByUserId:"message:read:user:",
+      userUnsubscribedChannelById:"unsubscribed.channel:user:",
+      userSubscribedChannelById:"subscribed.channel:user:",
     },
     list:{
+      allChannel:"channel:all",
       commonChannel:"channel:common",
       cityChannelById:"channel:city:",
       schoolChannelById:"channel:school:",
-      userUnsubscribedChannelById:"unsubscribed.channel:user:",
-      userSubscribedChannelById:"subscribed.channel:user:",
 
       allUser:"user:all",
       cityUserById:"user:city:",
@@ -73,9 +75,9 @@ module.exports = {
   },
   bearychat:{
     incoming:{
-      url:"https://hook.bearychat.com/xxxxx" //yours incoming bot url
+      url:"https://hook.bearychat.com/=bw8fe/incoming/0249756f9b5d2df8429845794486acf0"
     },
-    appTestChannel:"xxx",//yours bearychat channel name
+    appTestChannel:"监听者",
 
   },
 
