@@ -8,7 +8,7 @@ module.exports = {
     const bearychatChannelName = ctx.checkBody('channel_name').notEmpty().value;
     const bearychatUserName = ctx.checkBody('user_name').notEmpty().value;
     const text = ctx.checkBody('text').notEmpty().value;
-    const triggerWord = ctx.checkBody('trigger_word').notEmpty().value.substr(1);
+    const triggerWord = ctx.checkBody('trigger_word').notEmpty().value;
     logger.info(triggerWord)
     if (ctx.errors) {
       logger.warn(ctx.errors);
