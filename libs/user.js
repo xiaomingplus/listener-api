@@ -5,6 +5,7 @@ const common = require('../utils/common')
 module.exports = {
 
   getOneUser: async(id) => {
+    logger.info(id);
     return new Promise(async(s, f) => {
       try{
         var idR = await redisConn.hgetall(config.redisPrefix.hash.userById+id);

@@ -120,6 +120,10 @@ module.exports = {
       }
       const channelList = data.channels;
       let text = "你可能感兴趣的主题有：\n";
+      if(channelList.length===0){
+        text = "当前还没有主题";
+      }
+
       for(let i = 0;i<channelList.length;i++){
         text += channelList[i].name+"("+channelList[i].alias+")\n";
       }
