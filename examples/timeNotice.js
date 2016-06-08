@@ -1,5 +1,4 @@
 //第三方app示例
-//
 
 const axios = require('axios');
 const apiUrl = require('../config').localApiUrl;
