@@ -371,7 +371,7 @@ channels.postMessages = async (ctx) => {
   try{
   var channel =  await channelLib.getOneChannel(channelId);
   }catch(e){
-    ctx.status = e.status;
+    ctx.status = e.status;_
     ctx.body = e.body;
     return;
   }

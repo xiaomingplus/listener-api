@@ -18,7 +18,6 @@ module.exports = {
       return;
     }
     const account = bearychatChannelName + "_" + bearychatUserName;
-    logger.info(account)
     let user;
     try {
       user = await userLib.getOneUser(account);
@@ -71,6 +70,7 @@ module.exports = {
     if (triggerWord === '订阅') {
 
       const channelId = text.substr(2).trim();
+      logger.info(channelId)
       try {
         var subscriptionResult = await axios({
           url: config.localApiUrl + "/channels/"+channelId+"/following",
