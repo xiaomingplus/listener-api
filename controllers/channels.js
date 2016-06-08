@@ -13,13 +13,12 @@ const channels = {
 };
 
 channels.postChannels = async (ctx) => {
-
   const name = ctx.checkBody('name').notEmpty().value;
   const alias = ctx.checkBody('alias').notEmpty().value;
   const prefix= ctx.checkBody('prefix').notEmpty().value;
   const description = ctx.checkBody('description').notEmpty().value;
-  const allow_config = ctx.checkBody('allow_config').notEmpty().toBoolean().value;
-  const need_verified = ctx.checkBody('need_verified').notEmpty().toBoolean().value;
+  const allow_config = ctx.checkBody('allow_config').notEmpty().toInt().value;
+  const need_verified = ctx.checkBody('need_verified').notEmpty().toInt().value;
   const avatar = ctx.checkBody('avatar').notEmpty().value;
   const type = ctx.checkBody('type').optional().default("common").value;
   let city,school,college;
@@ -206,8 +205,9 @@ channels.postFollowing = async (ctx) => {
   const channelId = ctx.checkParams('id').notEmpty().value;
   var allow_push = ctx.request.body.allow_push;
   if(allow_push===undefined){
-    allow_push = true;
+    allow_push = 1;
   }
+  allow_push = parseInt(allow_push);
   if(ctx.errors){
     logger.warn(ctx.errors);
     ctx.status=422;
@@ -258,7 +258,7 @@ channels.postFollowing = async (ctx) => {
      redisConn.zrem(config.redisPrefix.sortedSet.userUnsubscribedChannelById+userId,channel.id)
  ];
  if(allow_push){
-   promiseArr.push(redisConn.lpush(config.redisPrefix.list.channelPushById+channel.id,userId));
+   promiseArr.push(redisConn.sadd(config.redisPrefix.set.channelPushById+channel.id,userId));
  }
 
     try{
@@ -332,7 +332,8 @@ channels.postUnfollowing = async (ctx) => {
      redisConn.zrem(config.redisPrefix.sortedSet.userFollowingByUserId+userId,channel.id),
      redisConn.zrem(config.redisPrefix.sortedSet.channelFollowerByChannelId+channel.id,userId),
      redisConn.zadd(config.redisPrefix.sortedSet.userUnsubscribedChannelById+userId,date.time(),channel.id),
-     redisConn.zrem(config.redisPrefix.sortedSet.userSubscribedChannelById+userId,channel.id)
+     redisConn.zrem(config.redisPrefix.sortedSet.userSubscribedChannelById+userId,channel.id),
+     redisConn.srem(config.redisPrefix.set.channelPushById+channel.id,userId)
  ];
 
 
@@ -371,7 +372,7 @@ channels.postMessages = async (ctx) => {
   try{
   var channel =  await channelLib.getOneChannel(channelId);
   }catch(e){
-    ctx.status = e.status;_
+    ctx.status = e.status;
     ctx.body = e.body;
     return;
   }

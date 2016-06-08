@@ -117,13 +117,12 @@ ${message.link_url}`;
       const name = message.channel.name;
 
       try {
-        var ids = await redisConn.lrange(config.redisPrefix.list.channelPushById + channelId, 0, -1);
+        var ids = await redisConn.smembers(config.redisPrefix.set.channelPushById + channelId);
       } catch (e) {
         f(e);
         return;
       }
       const promiseArr = [];
-
       for (let i = 0; i < ids.length; i++) {
         logger.info(ids[i])
         promiseArr.push(redisConn.hget(config.redisPrefix.hash.userById + ids[i], "device"));
