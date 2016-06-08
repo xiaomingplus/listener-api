@@ -17,27 +17,29 @@ const push = (text) =>{
     );
 };
 
-
-
 const hourReport = () => {
         const time = new Date();
         const hours = time.getHours();
         const mins = time.getMinutes();
         const secs = time.getSeconds();
         const next = ((60 - mins) * 60 - secs) * 1000;
-        console.log(mins);
         setTimeout(hourReport, next);
-        if (mins == 0) {
-            const text = "现在是北京时间："+hours+"点整";
+        if (mins === 0) {
+            const text = "整点为您报时，现在是北京时间："+time.toLocaleString("zh-Hans-CN","Asia/Shanghai");
             console.log(text);
-            push(text);
-        }else{
-            console.log('启动时间:'+time);
-            push('整点报时已启动,现在是'+time).then((r)=>{
+            push(text).then((r)=>{
               console.log(r.data);
             },(e)=>{
               console.log(e.data);
-            })
+            });
+        }else{
+            const content = '整点报时已启动,现在是北京时间'+time.toLocaleString("zh-Hans-CN","Asia/Shanghai");
+            console.log(content);
+            push(content).then((r)=>{
+              console.log(r.data);
+            },(e)=>{
+              console.log(e.data);
+            });
 
         }
     }
