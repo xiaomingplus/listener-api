@@ -17,6 +17,10 @@ const push = (text) =>{
     );
 };
 
+var x = new Date();
+console.log(x);
+console.log('getTime:'+x.getTime());
+
 const hourReport = () => {
         const time = new Date();
         const hours = time.getHours();
