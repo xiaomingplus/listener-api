@@ -98,7 +98,36 @@ module.exports = {
       ctx.body = {
         text: "已成功订阅该主题！"
       };
-    } else if (triggerWord === '主题') {
+    }else if (triggerWord === '取关') {
+        const unfollowingChannelId = text.substr(2).trim();
+        try {
+          var subscriptionResult = await axios({
+            url: config.localApiUrl + "/channels/"+unfollowingChannelId+"/unfollowing",
+            method: "post",
+            data: {
+              user_id: user.id
+            }
+          });
+        } catch (e) {
+
+          if (e instanceof Error) {
+            logger.error('Error', e.message);
+
+            ctx.body = {
+              text: JSON.stringify(e.message)
+            }
+          } else {
+            ctx.body = {
+              text: JSON.stringify(e.data.errors)
+            }
+          }
+          return;
+        }
+
+        ctx.body = {
+          text: "已成功取消订阅该主题！"
+        };
+      }else if (triggerWord === '主题') {
       try {
         var {
           data

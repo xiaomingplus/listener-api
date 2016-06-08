@@ -284,6 +284,81 @@ channels.postFollowing = async (ctx) => {
   }
 };
 
+channels.postUnfollowing = async (ctx) => {
+
+  const userId = ctx.checkBody('user_id').notEmpty().isUUID(null,4).value;
+  const channelId = ctx.checkParams('id').notEmpty().value;
+  if(ctx.errors){
+    logger.warn(ctx.errors);
+    ctx.status=422;
+    ctx.body = {
+      ...config.errors.invalid_params,
+      errors:ctx.errors
+    };
+  }else{
+    try{
+    var channel =  await channelLib.getOneChannel(channelId);
+    }catch(e){
+      ctx.status = e.status;
+      ctx.body = e.body;
+      return;
+    }
+    try{
+      var r =  await redisConn.exists(config.redisPrefix.common.subscription+config.redisPrefix.common.channel+channel.id+":"+config.redisPrefix.common.user+userId);
+    }catch(e){
+      logger.error(e);
+      ctx.status = 500;
+      ctx.body = {
+        ...config.errors.internal_server_error,
+        errors:[
+          e
+        ]
+      };
+      return;
+    }
+    if(r===0){
+      ctx.status = 409;
+      ctx.body = {
+        ...config.errors.conflict,
+        errors:[
+          "没有关注该主题"
+        ]
+      };
+      return;
+    }
+
+    const promiseArr = [
+     redisConn.del(config.redisPrefix.common.subscription+config.redisPrefix.common.channel+channel.id+":"+config.redisPrefix.common.user+userId),
+     redisConn.zrem(config.redisPrefix.sortedSet.userFollowingByUserId+userId,channel.id),
+     redisConn.zrem(config.redisPrefix.sortedSet.channelFollowerByChannelId+channel.id,userId),
+     redisConn.zadd(config.redisPrefix.sortedSet.userUnsubscribedChannelById+userId,date.time(),channel.id),
+     redisConn.zrem(config.redisPrefix.sortedSet.userSubscribedChannelById+userId,channel.id)
+ ];
+
+
+    try{
+      var r =  await Promise.all(promiseArr);
+    }catch(e){
+      logger.error(e);
+      ctx.status = 500;
+      ctx.body = {
+        ...config.errors.internal_server_error,
+        errors:[
+          e
+        ]
+      };
+      return;
+}
+
+    ctx.status = 201;
+    ctx.body = {
+      success:true,
+      user_id:userId,
+      channel:channel
+    };
+  }
+};
+
 channels.postMessages = async (ctx) => {
 
   const text = ctx.checkBody('text').notEmpty().value;

@@ -71,6 +71,7 @@ router.post('/channels',channels.postChannels);
 router.get('/channels/:id',channels.getOneChannel);
 router.get('/channels/:id/messages',channels.getMessages);
 router.post('/channels/:id/following',channels.postFollowing);
+router.post('/channels/:id/unfollowing',channels.postUnfollowing);
 router.post('/channels/:id/messages',channels.postMessages);
 router.post('/users',users.postUsers);
 router.get('/users/:id',users.getOneUser);
