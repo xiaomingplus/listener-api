@@ -30,13 +30,6 @@ setInterval(()=>{
     }, (e) => {
       console.log(e.data);
     });       
-  }else{
-    //休息时间
-    push('test').then((r) => {
-      // console.log(r.data);
-    }, (e) => {
-      console.log(e.data);
-    });
   }
 
 },1000*60*60);
