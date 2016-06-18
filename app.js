@@ -25,7 +25,7 @@ log4js.configure({
 const logger = log4js.getLogger('app');
 logger.setLevel('info');
 app.use(cors({
-  origin:true
+  origin:"*"
 }));
 require('koa-validate')(app);
 app.use(async function (ctx, next) {
