@@ -82,6 +82,7 @@ module.exports = {
             });
             return;
           }
+          console.log(followers_count);
           aliasR.followers_count = followers_count;
           if(userId){
             try{
