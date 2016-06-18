@@ -85,7 +85,6 @@ app.use(router.routes())
 .use(router.allowedMethods({
   throw:true
 }));
-app.use(staticServer('static' ));
 
 app.use(async (ctx, next) => {
   ctx.status = 404;
