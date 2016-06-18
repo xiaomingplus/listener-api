@@ -2,7 +2,6 @@ const Koa = require('koa');
 const config = require('./config');
 const staticServer = require('koa-serve-static');
 const app = new Koa();
-const cors = require('koa-cors');
 const bodyParser = require('koa-bodyparser');
 const router = require('koa-router')();
 const path = require('path');
@@ -24,9 +23,7 @@ log4js.configure({
 // app.use(log4js.koaLogger(log4js.getLogger("http"), { level: 'auto' }));
 const logger = log4js.getLogger('app');
 logger.setLevel('info');
-app.use(cors({
-  origin:"*"
-}));
+
 require('koa-validate')(app);
 app.use(async function (ctx, next) {
   const start = new Date();
@@ -57,10 +54,12 @@ app.use(bodyParser({
   }
 }));
 
-// router.all('*',async function (ctx, next) {
-//
-//   await next();
-// });
+router.all('*',async function (ctx, next) {
+  ctx.response.header = {
+    "Access-Control-Allow-Origin":"*"
+  }
+  await next();
+});
 
 router.get('/', (ctx ,next) => {
   ctx.body =  config.redisPrefix;
