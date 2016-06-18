@@ -68,6 +68,7 @@ module.exports = {
           }
 
           try{
+            console.log(config.redisPrefix.sortedSet.channelFollowerByChannelId+aliasR.id,config.defaultParams.minTimestamp,config.defaultParams.maxTimestamp);
             var followers_count = await redisConn.zcount(config.redisPrefix.sortedSet.channelFollowerByChannelId+aliasR.id,config.defaultParams.minTimestamp,config.defaultParams.maxTimestamp);
           }catch(e){
             logger.error(e);
