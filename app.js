@@ -54,7 +54,7 @@ app.use(bodyParser({
 }));
 
 router.all('*',async function (ctx, next) {
-  ctx.response.header = {
+  ctx.header = {
     "Access-Control-Allow-Origin":"*"
   }
   await next();
