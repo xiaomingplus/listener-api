@@ -1,6 +1,8 @@
 const Koa = require('koa');
 const config = require('./config');
+const staticServer = require('koa-serve-static');
 const app = new Koa();
+const cors = require('koa-cors');
 const bodyParser = require('koa-bodyparser');
 const router = require('koa-router')();
 const path = require('path');
@@ -19,13 +21,13 @@ log4js.configure({
   ],
   replaceConsole: true
 });
-app.use(log4js.koaLogger(log4js.getLogger("http"), { level: 'auto' }));
+// app.use(log4js.koaLogger(log4js.getLogger("http"), { level: 'auto' }));
 const logger = log4js.getLogger('app');
 logger.setLevel('info');
-
+app.use(cors({
+  origin:true
+}));
 require('koa-validate')(app);
-
-
 app.use(async function (ctx, next) {
   const start = new Date();
   await next();
@@ -40,7 +42,6 @@ app.use(async function (ctx, next) {
   const ms = new Date() - start;
   logger.info(`${ctx.method} ${ctx.url} - ${ms}`);
 });
-
 
 
 app.use(bodyParser({
@@ -79,12 +80,14 @@ router.get('/users/:id/timeline',users.getUnsubscriptions);
 router.get('/users/:id/channels',users.getFollowings);
 router.get('/users/:id/messages',users.getMessages);
 router.get('/messages/:id',messages.getOneMessage);
-
 router.post('/bearychat',bearychat.receive);
+
 app.use(router.routes())
 .use(router.allowedMethods({
   throw:true
 }));
+app.use(staticServer('static' ));
+
 app.use(async (ctx, next) => {
   ctx.status = 404;
   ctx.body = {
