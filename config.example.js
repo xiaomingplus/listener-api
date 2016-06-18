@@ -2,7 +2,9 @@ module.exports = {
   defaultParams:{
     listLength:15,
     listMaxLength:50,
-    allow_push:true
+    allow_push:true,
+    minTimestamp:0,
+    maxTimestamp:99999999999
   },
   localApiUrl:"http://127.0.0.1:3000",
   remoteApiUrl:"http://api.jiantingzhe.com",
