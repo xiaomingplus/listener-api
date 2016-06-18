@@ -1,7 +1,8 @@
 module.exports = {
   defaultParams:{
     listLength:15,
-    listMaxLength:50
+    listMaxLength:50,
+    allow_push:true
   },
   localApiUrl:"http://127.0.0.1:3000",
   remoteApiUrl:"http://api.jiantingzhe.com",
@@ -46,7 +47,7 @@ module.exports = {
 
     },
     set:{
-
+      channelPushById:"push:channel:"
     },
     sortedSet:{
 
@@ -68,9 +69,8 @@ module.exports = {
       schoolUserById:"user:school:",
 
       userMessagesById:"message:user:",
-      channelMessagesById:"message:channel:",
+      channelMessagesById:"message:channel:"
 
-      channelPushById:"push:channel:"
     }
   },
   bearychat:{

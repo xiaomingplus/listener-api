@@ -112,7 +112,7 @@ schools.getSchools = async (ctx) => {
 
   }
   ctx.body = {
-    schools:result
+    list:result
   }
 };
 

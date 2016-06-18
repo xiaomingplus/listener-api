@@ -7,6 +7,7 @@ const uuid = require('node-uuid');
 const logger = require('koa-log4').getLogger('Channels');
 const timeline = require('../libs/timeline');
 const channelLib = require('../libs/channel');
+const userLib = require('../libs/user');
 const push = require('../libs/push');
 const channels = {
 
@@ -17,8 +18,7 @@ channels.postChannels = async (ctx) => {
   const alias = ctx.checkBody('alias').notEmpty().value;
   const prefix= ctx.checkBody('prefix').notEmpty().value;
   const description = ctx.checkBody('description').notEmpty().value;
-  const allow_config = ctx.checkBody('allow_config').notEmpty().toInt().value;
-  const need_verified = ctx.checkBody('need_verified').notEmpty().toInt().value;
+  const allow_config = ctx.checkBody('allow_config').notEmpty().toBoolean().value;
   const avatar = ctx.checkBody('avatar').notEmpty().value;
   const type = ctx.checkBody('type').optional().default("common").value;
   let city,school,college;
@@ -68,8 +68,7 @@ channels.postChannels = async (ctx) => {
       name,
       prefix,
       description,
-      allow_config,
-      need_verified,
+      allow_config:allow_config?1:0,
       type,
       avatar,
       created:date.time(),
@@ -107,6 +106,7 @@ channels.postChannels = async (ctx) => {
       return;
     }
     ctx.status = 201;
+    item.allow_config = allow_config?true:false;
     ctx.body = item;
     // write user's timeline
      timeline.postUnsubscribedChannel({
@@ -171,13 +171,14 @@ channels.getMessages = async (ctx) => {
     };
     return;
   }
+  channel.allow_config=channel.allow_config==="1"?true:false
   ctx.body = {
-    messages:result,
+    list:result,
     channel:channel
   }
 }
 channels.getOneChannel = async (ctx) => {
-
+    const userId = ctx.checkQuery('user_id').optional().value;
     const id = ctx.checkParams('id').notEmpty().value;
     if(ctx.errors){
       logger.warn(ctx.errors);
@@ -187,8 +188,19 @@ channels.getOneChannel = async (ctx) => {
         errors:ctx.errors
       };
     }else{
+      if(userId){
+        try{
+        var user =  await userLib.getOneUser(userId);
+        }catch(e){
+          ctx.status = e.status;
+          ctx.body = e.body;
+          return;
+        }
+
+      }
+
       try{
-      var result = await channelLib.getOneChannel(id);
+      var result = await channelLib.getOneChannel(id,userId?user.id:null);
       }catch(e){
         ctx.status = e.status;
         ctx.body = e.body;
@@ -199,15 +211,15 @@ channels.getOneChannel = async (ctx) => {
     }
 };
 
-channels.postFollowing = async (ctx) => {
+channels.postSubscription = async (ctx) => {
 
-  const userId = ctx.checkBody('user_id').notEmpty().isUUID(null,4).value;
+  const userId = ctx.checkBody('user_id').notEmpty().value;
   const channelId = ctx.checkParams('id').notEmpty().value;
-  var allow_push = ctx.request.body.allow_push;
+  let allow_push = ctx.request.body.allow_push;
   if(allow_push===undefined){
-    allow_push = 1;
+    allow_push = config.defaultParams.allow_push;
   }
-  allow_push = parseInt(allow_push);
+  allow_push = allow_push?1:0;
   if(ctx.errors){
     logger.warn(ctx.errors);
     ctx.status=422;
@@ -224,7 +236,14 @@ channels.postFollowing = async (ctx) => {
       return;
     }
     try{
-      var r =  await redisConn.exists(config.redisPrefix.common.subscription+config.redisPrefix.common.channel+channel.id+":"+config.redisPrefix.common.user+userId);
+    var user =  await userLib.getOneUser(userId);
+    }catch(e){
+      ctx.status = e.status;
+      ctx.body = e.body;
+      return;
+    }
+    try{
+      var r =  await redisConn.exists(config.redisPrefix.common.subscription+config.redisPrefix.common.channel+channel.id+":"+config.redisPrefix.common.user+user.id);
     }catch(e){
       logger.error(e);
       ctx.status = 500;
@@ -252,13 +271,13 @@ channels.postFollowing = async (ctx) => {
     };
 
     const promiseArr = [
-     redisConn.hmset(config.redisPrefix.common.subscription+config.redisPrefix.common.channel+channel.id+":"+config.redisPrefix.common.user+userId,item),
-     redisConn.zadd(config.redisPrefix.sortedSet.userFollowingByUserId+userId,date.time(),channel.id),
-     redisConn.zadd(config.redisPrefix.sortedSet.channelFollowerByChannelId+channel.id,date.time(),userId),
-     redisConn.zrem(config.redisPrefix.sortedSet.userUnsubscribedChannelById+userId,channel.id)
+     redisConn.hmset(config.redisPrefix.common.subscription+config.redisPrefix.common.channel+channel.id+":"+config.redisPrefix.common.user+user.id,item),
+     redisConn.zadd(config.redisPrefix.sortedSet.userFollowingByUserId+user.id,date.time(),channel.id),
+     redisConn.zadd(config.redisPrefix.sortedSet.channelFollowerByChannelId+channel.id,date.time(),user.id),
+     redisConn.zrem(config.redisPrefix.sortedSet.userUnsubscribedChannelById+user.id,channel.id)
  ];
  if(allow_push){
-   promiseArr.push(redisConn.sadd(config.redisPrefix.set.channelPushById+channel.id,userId));
+   promiseArr.push(redisConn.sadd(config.redisPrefix.set.channelPushById+channel.id,user.id));
  }
 
     try{
@@ -274,19 +293,21 @@ channels.postFollowing = async (ctx) => {
       };
       return;
 }
-
+    item.allow_push = allow_push?true:false;
+    channel.allow_push= item.allow_push;
+    channel.following = true;
     ctx.status = 201;
     ctx.body = {
       ...item,
-      user_id:userId,
+      user:user,
       channel:channel
     };
   }
 };
 
-channels.postUnfollowing = async (ctx) => {
+channels.delSubscription = async (ctx) => {
 
-  const userId = ctx.checkBody('user_id').notEmpty().isUUID(null,4).value;
+  const userId = ctx.checkBody('user_id').notEmpty().value;
   const channelId = ctx.checkParams('id').notEmpty().value;
   if(ctx.errors){
     logger.warn(ctx.errors);
@@ -304,7 +325,14 @@ channels.postUnfollowing = async (ctx) => {
       return;
     }
     try{
-      var r =  await redisConn.exists(config.redisPrefix.common.subscription+config.redisPrefix.common.channel+channel.id+":"+config.redisPrefix.common.user+userId);
+    var user =  await userLib.getOneUser(userId);
+    }catch(e){
+      ctx.status = e.status;
+      ctx.body = e.body;
+      return;
+    }
+    try{
+      var r =  await redisConn.exists(config.redisPrefix.common.subscription+config.redisPrefix.common.channel+channel.id+":"+config.redisPrefix.common.user+user.id);
     }catch(e){
       logger.error(e);
       ctx.status = 500;
@@ -328,12 +356,12 @@ channels.postUnfollowing = async (ctx) => {
     }
 
     const promiseArr = [
-     redisConn.del(config.redisPrefix.common.subscription+config.redisPrefix.common.channel+channel.id+":"+config.redisPrefix.common.user+userId),
-     redisConn.zrem(config.redisPrefix.sortedSet.userFollowingByUserId+userId,channel.id),
-     redisConn.zrem(config.redisPrefix.sortedSet.channelFollowerByChannelId+channel.id,userId),
-     redisConn.zadd(config.redisPrefix.sortedSet.userUnsubscribedChannelById+userId,date.time(),channel.id),
-     redisConn.zrem(config.redisPrefix.sortedSet.userSubscribedChannelById+userId,channel.id),
-     redisConn.srem(config.redisPrefix.set.channelPushById+channel.id,userId)
+     redisConn.del(config.redisPrefix.common.subscription+config.redisPrefix.common.channel+channel.id+":"+config.redisPrefix.common.user+user.id),
+     redisConn.zrem(config.redisPrefix.sortedSet.userFollowingByUserId+user.id,channel.id),
+     redisConn.zrem(config.redisPrefix.sortedSet.channelFollowerByChannelId+channel.id,user.id),
+     redisConn.zadd(config.redisPrefix.sortedSet.userUnsubscribedChannelById+user.id,date.time(),channel.id),
+     redisConn.zrem(config.redisPrefix.sortedSet.userSubscribedChannelById+user.id,channel.id),
+     redisConn.srem(config.redisPrefix.set.channelPushById+channel.id,user.id)
  ];
 
 
@@ -352,19 +380,18 @@ channels.postUnfollowing = async (ctx) => {
 }
 
     ctx.status = 201;
+    channel.following = false;
     ctx.body = {
-      success:true,
-      user_id:userId,
+      user:user,
       channel:channel
     };
   }
 };
 
 channels.postMessages = async (ctx) => {
-
   const text = ctx.checkBody('text').notEmpty().value;
   const channelId = ctx.checkParams('id').notEmpty().value;
-  const user_id = ctx.checkBody('user_id').optional().isUUID(null,4).value;
+  const userId = ctx.checkBody('user_id').optional().value;
   const pictures = ctx.checkBody('pictures').optional().default([]).value;
   const type = ctx.checkBody('type').optional().default("text").value;
   const id = uuid.v4();
@@ -384,8 +411,15 @@ channels.postMessages = async (ctx) => {
       created:date.time(),
       updated:date.time()
     };
-  if(user_id){
-    item.user_id = user_id;
+  if(userId){
+    try{
+    var user =  await userLib.getOneUser(userId);
+    }catch(e){
+      ctx.status = e.status;
+      ctx.body = e.body;
+      return;
+    }
+    item.user_id = userId;
   }
   if(type === 'link'){
      link_url = ctx.checkBody('link_url').notEmpty().value;
@@ -429,7 +463,7 @@ channels.postMessages = async (ctx) => {
 
     }
 
-    if(!user_id){
+    if(!userId){
       try{
         await redisConn.lpush(config.redisPrefix.list.channelMessagesById+channel.id,id);
       }catch(e){
@@ -447,20 +481,20 @@ channels.postMessages = async (ctx) => {
     ctx.status = 201;
     item.channel =channel;
     ctx.body = item;
-    if(user_id){
+    if(userId){
       timeline.postUnreadMessage({
         messageId:id,
-        userId:user_id,
+        userId:user.id,
        });
 
        timeline.postMessage(
          {
            messageId:id,
-           userId:user_id,
+           userId:user.id,
           }
        );
        push.user({
-         userId:user_id,
+         userId:user.id,
          messageId:id
        });
     }else{

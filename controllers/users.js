@@ -4,7 +4,7 @@ const config = require('../config');
 const date = require('../utils/date');
 const common = require('../utils/common');
 const uuid = require('node-uuid');
-const usersLib = require('../libs/user');
+const userLib = require('../libs/user');
 const logger = require('koa-log4').getLogger('Users');
 const timeline = require('../libs/timeline');
 const users = {
@@ -192,7 +192,7 @@ users.getOneUser = async (ctx) => {
       };
     }else{
       try{
-      var result = await usersLib.getOneUser(id);
+      var result = await userLib.getOneUser(id);
       }catch(e){
         logger.error(e)
         ctx.status = e.status;
@@ -205,7 +205,7 @@ users.getOneUser = async (ctx) => {
 };
 
 users.getUnsubscriptions = async (ctx) => {
-    const userId = ctx.checkParams('id').notEmpty().isUUID(null,4).value;
+    const userId = ctx.checkParams('id').notEmpty().value;
     const start = ctx.checkQuery('start').optional().default(0).toInt().ge(0).value;
     const limit = ctx.checkQuery('limit').optional().default(config.defaultParams.listLength).toInt().gt(0).le(config.defaultParams.listMaxLength).value;
     if(ctx.errors){
@@ -220,7 +220,16 @@ users.getUnsubscriptions = async (ctx) => {
 
     const stop = start+limit-1;
     try{
-      var idsR = await redisConn.zrevrange(config.redisPrefix.sortedSet.userUnsubscribedChannelById+userId,start,stop);
+    var user =  await userLib.getOneUser(userId);
+    }catch(e){
+      console.log('1');
+      console.log(e);
+      ctx.status = e.status;
+      ctx.body = e.body;
+      return;
+    }
+    try{
+      var idsR = await redisConn.zrevrange(config.redisPrefix.sortedSet.userUnsubscribedChannelById+user.id,start,stop);
     }catch(e){
       logger.error(e);
       ctx.status = 500;
@@ -233,9 +242,10 @@ users.getUnsubscriptions = async (ctx) => {
       return;
 
     }
-    const ids = [];
+    const ids = [],countIds=[];
     for (let i=0;i<idsR.length;i++){
       ids.push(config.redisPrefix.hash.channelById+idsR[i]);
+      countIds.push(config.redisPrefix.sortedSet.channelFollowerByChannelId+idsR[i]);
     }
     try{
       var result =await redis.mhgetall(ids);
@@ -251,14 +261,39 @@ users.getUnsubscriptions = async (ctx) => {
       return;
 
     }
+
+    try{
+      var followers_counts = await redis.mzcount(countIds);
+    }catch(e){
+      logger.error(e);
+      f({
+        status: 5000,
+        body: {
+          ...config.errors.internal_server_error,
+          errors: [
+            e
+          ]
+        }
+      });
+      return;
+    }
+    for(let i=0;i<result.length;i++){
+      result[i].following=false;
+      result[i].followers_count = followers_counts[i]
+      if(result[i].allow_config==="0"){
+        result[i].allow_config=false;
+      }else{
+        result[i].allow_config=true;
+      }
+    }
     ctx.body = {
-      channels:result
+      list:result
     }
 
 }
 
 users.getFollowings = async (ctx) => {
-  const userId = ctx.checkParams('id').notEmpty().isUUID(null,4).value;
+  const userId = ctx.checkParams('id').notEmpty().value;
   const start = ctx.checkQuery('start').optional().default(0).toInt().ge(0).value;
   const limit = ctx.checkQuery('limit').optional().default(config.defaultParams.listLength).toInt().gt(0).le(config.defaultParams.listMaxLength).value;
   if(ctx.errors){
@@ -272,7 +307,14 @@ users.getFollowings = async (ctx) => {
   }
   const stop = start+limit-1;
   try{
-    var idsR = await redisConn.zrevrange(config.redisPrefix.sortedSet.userFollowingByUserId+userId,start,stop);
+  var user =  await userLib.getOneUser(userId);
+  }catch(e){
+    ctx.status = e.status;
+    ctx.body = e.body;
+    return;
+  }
+  try{
+    var idsR = await redisConn.zrevrange(config.redisPrefix.sortedSet.userFollowingByUserId+user.id,start,stop);
   }catch(e){
     logger.error(e);
     ctx.status = 500;
@@ -285,9 +327,10 @@ users.getFollowings = async (ctx) => {
     return;
 
   }
-  const ids = [];
+  const ids = [],countIds=[];
   for (let i=0;i<idsR.length;i++){
     ids.push(config.redisPrefix.hash.channelById+idsR[i]);
+    countIds.push(config.redisPrefix.sortedSet.channelFollowerByChannelId+idsR[i]);
   }
   try{
     var result =await redis.mhgetall(ids);
@@ -303,14 +346,44 @@ users.getFollowings = async (ctx) => {
     return;
 
   }
+  try{
+    var followers_counts = await redis.mzcount(countIds);
+  }catch(e){
+    logger.error(e);
+    f({
+      status: 5000,
+      body: {
+        ...config.errors.internal_server_error,
+        errors: [
+          e
+        ]
+      }
+    });
+    return;
+  }
+  const subscriptionKeys = [];
+  for(let i=0;i<result.length;i++){
+    subscriptionKeys.push(config.redisPrefix.common.subscription+config.redisPrefix.common.channel+result[i].id+":"+config.redisPrefix.common.user+user.id);
+    result[i].following=true;
+    result[i].followers_count = followers_counts[i]
+    if(result[i].allow_config==="0"){
+      result[i].allow_config=false;
+    }else{
+      result[i].allow_config=true;
+    }
+  }
+  const allow_pushArr =await redis.mhgetall(subscriptionKeys);
+  for(let i=0;i<result.length;i++){
+    result[i].allow_push = (allow_pushArr[i].allow_push==='0'?false:true)
+  }
   ctx.body = {
-    channels:result
+    list:result
   }
 
 }
 
 users.getMessages = async (ctx) => {
-  const userId = ctx.checkParams('id').notEmpty().isUUID(null,4).value;
+  const userId = ctx.checkParams('id').notEmpty().value;
   const start = ctx.checkQuery('start').optional().default(0).toInt().ge(0).value;
   const limit = ctx.checkQuery('limit').optional().default(config.defaultParams.listLength).toInt().gt(0).le(config.defaultParams.listMaxLength).value;
   if(ctx.errors){
@@ -324,7 +397,14 @@ users.getMessages = async (ctx) => {
   }
   const stop = start+limit-1;
   try{
-    var idsR = await redisConn.lrange(config.redisPrefix.list.userMessagesById+userId,start,stop);
+  var user =  await userLib.getOneUser(userId);
+  }catch(e){
+    ctx.status = e.status;
+    ctx.body = e.body;
+    return;
+  }
+  try{
+    var idsR = await redisConn.lrange(config.redisPrefix.list.userMessagesById+user.id,start,stop);
   }catch(e){
     logger.error(e);
     ctx.status = 500;
@@ -355,7 +435,7 @@ users.getMessages = async (ctx) => {
     return;
   }
   ctx.body = {
-    messages:result
+    list:result
   }
 }
 

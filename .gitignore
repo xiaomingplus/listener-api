@@ -2,9 +2,9 @@
 *.log
 npm-debug.log*
 .DS_Store
-test
 # Runtime data
 pids
+test
 *.pid
 *.seed
 dump.rdb
