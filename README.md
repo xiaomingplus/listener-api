@@ -14,9 +14,12 @@
 
 运行的话，请确保redis已运行.然后可以:
 
+    git clone https://github.com/xiaomingplus/listener-libs.git
     git clone https://github.com/xiaomingplus/listener-api.git
-    cd listener-api
+
+    cd listener-libs
     cp config.example.js config.js
+    cd ../listener-api
     npm i
     node index.js
 
