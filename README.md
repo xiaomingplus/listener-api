@@ -16,11 +16,13 @@
 
     git clone https://github.com/xiaomingplus/listener-libs.git
     git clone https://github.com/xiaomingplus/listener-api.git
-
     cd listener-libs
     cp config.example.js config.js
+    npm i
     cd ../listener-api
     npm i
     node index.js
 
 Now ,it maybe works. You can visit [http://localhost:3000](http://localhost:3000)
+
+为啥要下载libs？因为本项目依赖这个公共库
