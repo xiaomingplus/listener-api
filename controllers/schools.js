@@ -1,9 +1,9 @@
-const redisConn = require('../utils/redisConn');
-const redis = require('../utils/redis.js');
-const config = require('../config');
-const date = require('../utils/date');
-const common = require('../utils/common');
-const logger = require('koa-log4').getLogger('schools');
+import redisConn from '../../listener-libs/redisConn';
+import {mhgetall} from 'general-node-utils';
+import config from '../../listener-libs/config';
+import {time,isObjectEmpty} from 'general-js-utils';
+import logger4 from 'koa-log4';
+const logger = logger4.getLogger('school');
 const schools = {
 
 };
@@ -48,8 +48,8 @@ schools.postSchools = async (ctx) => {
     const item = {
       id:id,
       name:name,
-      created:date.time(),
-      updated:date.time()
+      created:time(),
+      updated:time()
     };
     try{
        await Promise.all([
@@ -97,7 +97,7 @@ schools.getSchools = async (ctx) => {
     ids.push(config.redisPrefix.schoolsByIdHansh+idsR[i]);
   }
   try{
-    var result =await redis.mhgetall(ids);
+    var result =await mhgetall(redisConn,ids);
     console.log(result);
   }catch(e){
     logger.error(e);
@@ -142,7 +142,7 @@ schools.getOneSchool = async (ctx) => {
         return;
 
       }
-      if(common.isEmptyObject(idR)){
+      if(isObjectEmpty(idR)){
         try{
           var idFromName = await redisConn.get(config.redisPrefix.schoolsByNameString+id);
         }catch(e){
@@ -194,4 +194,4 @@ schools.getOneSchool = async (ctx) => {
     }
 };
 
-module.exports = schools;
+export default schools;

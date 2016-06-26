@@ -1,19 +1,116 @@
-const redisConn = require('../utils/redisConn');
-const redis = require('../utils/redis.js');
-const config = require('../config');
-const date = require('../utils/date');
-const common = require('../utils/common');
-const uuid = require('node-uuid');
-const userLib = require('../libs/user');
-const logger = require('koa-log4').getLogger('Users');
-const timeline = require('../libs/timeline');
+import redisConn from '../../listener-libs/redisConn';
+import {mhgetall,mzcount,mgetjson} from 'general-node-utils';
+import config from '../../listener-libs/config';
+import uuid from 'node-uuid';
+import logger4 from 'koa-log4';
+const logger = logger4.getLogger('user');
+import {postChannelForNewUser} from '../../listener-libs/timeline';
+import {time,isObjectEmpty} from 'general-js-utils';
+import {md5Salt,generateToken} from '../../listener-libs/crypto';
+import {getOneUser} from '../../listener-libs/user'
 const users = {
 
 };
 
+users.postSessions = async (ctx) => {
+
+  const account = ctx.checkParams('id').notEmpty().value;
+  const token =ctx.checkBody('token').notEmpty().value;
+  const type = ctx.checkBody('type').notEmpty().value;
+
+ if(type!=='device'){
+    logger.warn(ctx.errors);
+    ctx.status=422;
+    ctx.body = {
+      ...config.errors.invalid_params,
+      errors:[
+        {
+          tags:'this login type is not support now'
+        }
+      ]
+    };
+    return;
+  }
+
+  try{
+  var user =  await getOneUser(account);
+  }catch(e){
+    logger.error(e);
+    ctx.status = e.status;
+    ctx.body = e.body;
+    return;
+  }
+  if(type=== 'device'){
+    try{
+      var verification = await md5Salt(token+user.id,user.created);
+    }catch(e){
+      logger.error(e);
+      ctx.status = 500;
+      ctx.body = {
+        ...config.errors.internal_server_error,
+        errors:[
+          e
+        ]
+      };
+      return;
+    }
+    if( verification!== user.verification ){
+      ctx.status = 401;
+      ctx.body = {
+        ...config.errors.unauthorized,
+        errors:[
+          {
+            token:"token is missing,invalid or expired"
+          }
+        ]
+      }
+      return;
+    }
+  }
+    try{
+      var sessionToken = await generateToken();
+    }catch(e){
+      logger.error(e);
+      ctx.status = 500;
+      ctx.body = {
+        ...config.errors.internal_server_error,
+        errors:[
+          e
+        ]
+      };
+      return;
+    }
+    const expire = time()+60*60*24*30;
+    try{
+      await redisConn.hmset(config.redisPrefix.hash.sessionByToken+sessionToken,{id:user.id,created:time()});
+      await redisConn.lpush(config.redisPrefix.list.sessionByUserId+user.id,sessionToken);
+      await redisConn.expireat(config.redisPrefix.hash.sessionByToken+sessionToken,expire);
+    }catch(e){
+      logger.error(e);
+      ctx.status = 500;
+      ctx.body = {
+        ...config.errors.internal_server_error,
+        errors:[
+          e
+        ]
+      };
+      return;
+    }
+
+    ctx.status = 201;
+    ctx.body = {
+      id:user.id,
+      token:sessionToken,
+      expire:expire
+    }
+
+};
+users.deleteSessions= async (ctx) =>{
+
+};
 users.postUsers = async (ctx) => {
   const name = ctx.checkBody('name').notEmpty().value;
-  const account = ctx.checkBody('account').notEmpty().value;
+  const account = ctx.checkBody('account').notEmpty().value.toString();
   const token = ctx.checkBody('token').notEmpty().value;
   const avatar = ctx.checkBody('avatar').notEmpty().isUrl().value;
   const educations = ctx.checkBody('educations').optional().default([]).value;
@@ -46,7 +143,7 @@ users.postUsers = async (ctx) => {
     };
     return;
   }else{
-
+    const item = {},nowTime = time();
     if(type === 'phone'){
 
     }else if(type === 'wechat'){
@@ -54,6 +151,36 @@ users.postUsers = async (ctx) => {
     }else if(type === 'bearychat'){
 
       // pass
+
+    }else if(type=== 'device'){
+
+      try{
+        const accountMd5 = await md5Salt(account,type);
+        var accountToken = await md5Salt(accountMd5,type);
+      }catch(e){
+        logger.error(e);
+        ctx.status = 500;
+        ctx.body = {
+          ...config.errors.internal_server_error,
+          errors:[
+            e
+          ]
+        };
+        return;
+      }
+      console.log(accountToken);
+      if(token!==accountToken){
+        ctx.status = 401;
+        ctx.body = {
+          ...config.errors.unauthorized,
+          errors:[
+            {
+              token:"token is missing,invalid or expired"
+            }
+          ]
+        }
+        return;
+      }
 
     }else{
       logger.warn(ctx.errors);
@@ -95,15 +222,26 @@ users.postUsers = async (ctx) => {
       return;
     }
     const id = uuid.v4();
-    const item = {
-      id,
-      account,
-      name,
-      avatar,
-      type,
-      created:date.time(),
-      updated:date.time()
-    };
+    try{
+      item.verification = await md5Salt(token+id,nowTime);
+    }catch(e){
+      logger.error(e);
+      ctx.status = 500;
+      ctx.body = {
+        ...config.errors.internal_server_error,
+        errors:[
+          e
+        ]
+      };
+      return;
+    }
+    item.id = id;
+    item.avatar = avatar;
+    item.name = name;
+    item.account = account;
+    item.type = type;
+    item.created = nowTime;
+    item.updated = nowTime;
     if(educations){
       item.educations = JSON.stringify(educations);
     }
@@ -111,7 +249,7 @@ users.postUsers = async (ctx) => {
       item.city = city;
     }
 
-    if(device && !common.isEmptyObject(device) && device.type && device.id ){
+    if(device && !isObjectEmpty(device) && device.type && device.id ){
       const _device = {};
       _device[device.type] = [
         {
@@ -121,7 +259,7 @@ users.postUsers = async (ctx) => {
 
       item.device = JSON.stringify(_device);
 
-    }else if(device && !common.isEmptyObject(device) && device.type && !device.id){
+    }else if(device && !isObjectEmpty(device) && device.type && !device.id){
       ctx.status=422;
       ctx.body = {
         ...config.errors.invalid_params,
@@ -168,9 +306,10 @@ users.postUsers = async (ctx) => {
     }
 
     ctx.status = 201;
+    delete item.verification;
     ctx.body = item;
 
-    timeline.postChannelForNewUser({
+    postChannelForNewUser({
       educations:educations,
       city:city,
       userId:id
@@ -192,7 +331,7 @@ users.getOneUser = async (ctx) => {
       };
     }else{
       try{
-      var result = await userLib.getOneUser(id);
+      var result = await getOneUser(id);
       }catch(e){
         logger.error(e)
         ctx.status = e.status;
@@ -204,7 +343,7 @@ users.getOneUser = async (ctx) => {
     }
 };
 
-users.getUnsubscriptions = async (ctx) => {
+users.getTimelines = async (ctx) => {
     const userId = ctx.checkParams('id').notEmpty().value;
     const start = ctx.checkQuery('start').optional().default(0).toInt().ge(0).value;
     const limit = ctx.checkQuery('limit').optional().default(config.defaultParams.listLength).toInt().gt(0).le(config.defaultParams.listMaxLength).value;
@@ -220,9 +359,8 @@ users.getUnsubscriptions = async (ctx) => {
 
     const stop = start+limit-1;
     try{
-    var user =  await userLib.getOneUser(userId);
+    var user =  await getOneUser(userId);
     }catch(e){
-      console.log('1');
       console.log(e);
       ctx.status = e.status;
       ctx.body = e.body;
@@ -248,7 +386,7 @@ users.getUnsubscriptions = async (ctx) => {
       countIds.push(config.redisPrefix.sortedSet.channelFollowerByChannelId+idsR[i]);
     }
     try{
-      var result =await redis.mhgetall(ids);
+      var result =await mhgetall(redisConn,ids);
     }catch(e){
       logger.error(e);
       ctx.status = 500;
@@ -263,7 +401,7 @@ users.getUnsubscriptions = async (ctx) => {
     }
 
     try{
-      var followers_counts = await redis.mzcount(countIds);
+      var followers_counts = await mzcount(redisConn,countIds);
     }catch(e){
       logger.error(e);
       f({
@@ -292,7 +430,7 @@ users.getUnsubscriptions = async (ctx) => {
 
 }
 
-users.getFollowings = async (ctx) => {
+users.getChannels = async (ctx) => {
   const userId = ctx.checkParams('id').notEmpty().value;
   const start = ctx.checkQuery('start').optional().default(0).toInt().ge(0).value;
   const limit = ctx.checkQuery('limit').optional().default(config.defaultParams.listLength).toInt().gt(0).le(config.defaultParams.listMaxLength).value;
@@ -307,7 +445,7 @@ users.getFollowings = async (ctx) => {
   }
   const stop = start+limit-1;
   try{
-  var user =  await userLib.getOneUser(userId);
+  var user =  await getOneUser(userId);
   }catch(e){
     ctx.status = e.status;
     ctx.body = e.body;
@@ -333,7 +471,7 @@ users.getFollowings = async (ctx) => {
     countIds.push(config.redisPrefix.sortedSet.channelFollowerByChannelId+idsR[i]);
   }
   try{
-    var result =await redis.mhgetall(ids);
+    var result =await mhgetall(redisConn,ids);
   }catch(e){
     logger.error(e);
     ctx.status = 500;
@@ -347,7 +485,7 @@ users.getFollowings = async (ctx) => {
 
   }
   try{
-    var followers_counts = await redis.mzcount(countIds);
+    var followers_counts = await mzcount(redisConn,countIds);
   }catch(e){
     logger.error(e);
     f({
@@ -372,7 +510,7 @@ users.getFollowings = async (ctx) => {
       result[i].allow_config=true;
     }
   }
-  const allow_pushArr =await redis.mhgetall(subscriptionKeys);
+  const allow_pushArr =await mhgetall(redisConn,subscriptionKeys);
   for(let i=0;i<result.length;i++){
     result[i].allow_push = (allow_pushArr[i].allow_push==='0'?false:true)
   }
@@ -397,7 +535,7 @@ users.getMessages = async (ctx) => {
   }
   const stop = start+limit-1;
   try{
-  var user =  await userLib.getOneUser(userId);
+  var user =  await getOneUser(userId);
   }catch(e){
     ctx.status = e.status;
     ctx.body = e.body;
@@ -422,7 +560,7 @@ users.getMessages = async (ctx) => {
     ids.push(config.redisPrefix.string.messageById+idsR[i]);
   }
   try{
-    var result =await redis.mgetalljson(ids);
+    var result =await mgetjson(redisConn,ids);
   }catch(e){
     logger.error(e);
     ctx.status = 500;
@@ -439,4 +577,4 @@ users.getMessages = async (ctx) => {
   }
 }
 
-module.exports = users;
+export default users;

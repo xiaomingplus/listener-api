@@ -1,7 +1,8 @@
-const logger = require('koa-log4').getLogger('Bearychat-controllers');
-const axios = require('axios');
-const config = require('../config');
-const userLib = require('../libs/user');
+import logger4 from 'koa-log4';
+const logger = logger4.getLogger('Bearychat-controllers');
+import axios from 'axios';
+import config from '../../listener-libs/config';
+import {getOneUser} from '../../listener-libs/user';
 module.exports = {
   receive: async(ctx) => {
     logger.info(ctx.request.body);
@@ -20,7 +21,7 @@ module.exports = {
     const account = bearychatChannelName + "_" + bearychatUserName;
     let user;
     try {
-      user = await userLib.getOneUser(account);
+      user = await getOneUser(account);
       console.info(user);
     } catch (e) {
       if (e.status === 404) {
@@ -73,7 +74,7 @@ module.exports = {
       logger.info(channelId)
       try {
         var subscriptionResult = await axios({
-          url: config.localApiUrl + "/channels/"+channelId+"/following",
+          url: config.localApiUrl + "/channels/"+channelId+"/subscriptions",
           method: "post",
           data: {
             user_id: user.id
@@ -102,8 +103,8 @@ module.exports = {
         const unfollowingChannelId = text.substr(2).trim();
         try {
           var subscriptionResult = await axios({
-            url: config.localApiUrl + "/channels/"+unfollowingChannelId+"/unfollowing",
-            method: "post",
+            url: config.localApiUrl + "/channels/"+unfollowingChannelId+"/subscriptions",
+            method: "delete",
             data: {
               user_id: user.id
             }
