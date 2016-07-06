@@ -8,16 +8,26 @@ import {postUnsubscribedChannel,postUnreadMessage,postMessage} from '../../liste
 import {getOneChannel} from '../../listener-libs/channel';
 import {user as pushToUser,channel as pushToChannel} from '../../listener-libs/push';
 import {time} from 'general-js-utils';
-import {getOneUser} from '../../listener-libs/user'
+import {getOneUser} from '../../listener-libs/user';
+import {generateToken} from '../../listener-libs/crypto';
+import {isObjectEmpty} from 'general-js-utils';
 const channels = {
 
 };
+function slow(){
+  return new Promise((s,f)=>{
+    setTimeout(()=>{
+      s();
+    },2000);
+  });
+}
 channels.postChannels = async (ctx) => {
   const name = ctx.checkBody('name').notEmpty().value;
   const alias = ctx.checkBody('alias').notEmpty().value;
   const prefix= ctx.checkBody('prefix').notEmpty().value;
   const description = ctx.checkBody('description').notEmpty().value;
   const allow_config = ctx.checkBody('allow_config').notEmpty().toBoolean().value;
+  const domain = ctx.checkBody('domain').notEmpty().isUrl().value;
   const avatar = ctx.checkBody('avatar').notEmpty().value;
   const type = ctx.checkBody('type').optional().default("common").value;
   let city,school,college;
@@ -28,6 +38,10 @@ channels.postChannels = async (ctx) => {
   }else if(type === 'college'){
     school = ctx.checkBody('school').notEmpty().value;
     college = ctx.checkBody('college').notEmpty().value;
+  }
+
+  if(allow_config){
+    var config_url = ctx.checkBody('config_url').notEmpty().isUrl().value;
   }
   if(ctx.errors){
     logger.warn(ctx.errors);
@@ -61,6 +75,19 @@ channels.postChannels = async (ctx) => {
       return;
     }
     const id = uuid.v4();
+    try{
+      var token = await generateToken();
+    }catch(e){
+      logger.error(e);
+      ctx.status = 500;
+      ctx.body = {
+        ...config.errors.internal_server_error,
+        errors:[
+          e
+        ]
+      };
+      return;
+    }
     const item = {
       id,
       alias,
@@ -73,6 +100,10 @@ channels.postChannels = async (ctx) => {
       created:time(),
       updated:time()
     };
+
+    if(config_url){
+      item.config_url=config_url;
+    }
     const pipeline = redisConn.pipeline();
     pipeline.lpush(config.redisPrefix.list.allChannel,id);
     if(type === 'common'){
@@ -90,6 +121,10 @@ channels.postChannels = async (ctx) => {
           pipeline.lpush(config.redisPrefix.common.channel+config.redisPrefix.common.school+school+":"+config.redisPrefix.common.college+college,id);
     }
      pipeline.hmset(config.redisPrefix.hash.channelById+id,item);
+     pipeline.hmset(config.redisPrefix.hash.channelAuthorizationById+id,{
+       token,
+       domain
+     });
      pipeline.set(config.redisPrefix.string.channelByAlias+alias,id);
     try{
        await pipeline.exec();
@@ -210,9 +245,50 @@ channels.getOneChannel = async (ctx) => {
     }
 };
 
+channels.getOneChannelAuthorizations= async (ctx) =>{
+  const channelId = ctx.checkParams('id').notEmpty().value;
+  try{
+  var result = await getOneChannel(channelId);
+  }catch(e){
+    console.log(e);
+    ctx.status = e.status;
+    ctx.body = e.body;
+    return;
+  }
+
+  try{
+    var auth = await redisConn.hgetall(config.redisPrefix.hash.channelAuthorizationById+result.id);
+    console.log(auth);
+  }catch(e){
+    logger.error(e);
+    ctx.status = 500;
+    ctx.body = {
+      ...config.errors.internal_server_error,
+      errors:[
+        e
+      ]
+    };
+    return;
+  }
+  if(!isObjectEmpty(auth)){
+    ctx.body =auth;
+    return;
+  }else{
+  ctx.status = 404;
+  ctx.body = {
+    ...config.errors.not_found,
+    errors:[
+      {
+        "id":"id is not exists or no token"
+      }
+    ]
+  };
+  }
+}
+
 channels.postSubscriptions = async (ctx) => {
 
-  const userId = ctx.checkBody('user_id').notEmpty().value;
+  const userId = ctx.userId;
   const channelId = ctx.checkParams('id').notEmpty().value;
   let allow_push = ctx.request.body.allow_push;
   if(allow_push===undefined){
@@ -296,18 +372,19 @@ channels.postSubscriptions = async (ctx) => {
     channel.allow_push= item.allow_push;
     channel.following = true;
     channel.followers_count = channel.followers_count+1;
-    ctx.status = 201;
-    ctx.body = {
-      ...item,
-      user:user,
-      channel:channel
-    };
+      ctx.status = 201;
+      ctx.body = {
+        ...item,
+        user:user,
+        channel:channel
+      };
+
   }
 };
 
 channels.delSubscriptions = async (ctx) => {
 
-  const userId = ctx.checkBody('user_id').notEmpty().value;
+  const userId = ctx.userId;
   const channelId = ctx.checkParams('id').notEmpty().value;
   if(ctx.errors){
     logger.warn(ctx.errors);
@@ -379,7 +456,7 @@ channels.delSubscriptions = async (ctx) => {
       return;
 }
 
-    ctx.status = 201;
+    ctx.status = 200;
     channel.following = false;
     channel.followers_count = channel.followers_count-1;
     delete channel.allow_push;

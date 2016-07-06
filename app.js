@@ -13,6 +13,7 @@ import users from './controllers/users';
 import messages from './controllers/messages';
 import bearychat from './controllers/bearychat';
 import redisConn from '../listener-libs/redisConn';
+import {auth,authScope} from '../listener-libs/auth';
 log4js.configure({
   appenders: [
     { type: 'console' },
@@ -57,12 +58,14 @@ app.use(bodyParser({
 
 router.all('*',async function (ctx, next) {
   ctx.set ({
-    "Access-Control-Allow-Origin":"*"
+    "Access-Control-Allow-Origin":"*",
+    "Access-Control-Allow-Headers":"Content-Type, Access-Control-Allow-Headers, Authorization, X-Requested-With",
+    "Access-Control-Allow-Methods":"POST,GET,HEAD,DELETE,PUT,PATCH"
   });
   await next();
 });
 
-router.get('/', (ctx ,next) => {
+router.get('/',auth,(ctx) => {
   // ctx.body =  config.redisPrefix;
   ctx.body = ctx.headers;
 });
@@ -71,17 +74,25 @@ router.get('/schools',schools.getSchools);
 router.get('/schools/:id',schools.getOneSchool);
 router.post('/channels',channels.postChannels);
 router.get('/channels/:id',channels.getOneChannel);
+router.get("/channels/:id/authorizations",channels.getOneChannelAuthorizations);
 router.get('/channels/:id/messages',channels.getMessages);
-router.post('/channels/:id/subscriptions',channels.postSubscriptions);
-router.del('/channels/:id/subscriptions',channels.delSubscriptions);
+router.post('/channels/:id/subscriptions',auth,channels.postSubscriptions);
+router.del('/channels/:id/subscriptions',auth,channels.delSubscriptions);
 router.post('/channels/:id/messages',channels.postMessages);
 router.post('/users',users.postUsers);
-router.get('/users/:id',users.getOneUser);
-router.post('/users/:id/sessions',users.postSessions);
-router.del('/users/:id/sessions',users.deleteSessions);
-router.get('/users/:id/timelines',users.getTimelines);
-router.get('/users/:id/channels',users.getChannels);
-router.get('/users/:id/messages',users.getMessages);
+router.get('/users',auth,users.getOneUser);
+router.get('/user_id',auth,users.getOneUserId);
+router.del('/sessions',auth,users.deleteSessions);
+router.get('/timelines',auth,users.getTimelines);
+router.get('/channels',auth,users.getChannels);
+router.get('/messages',auth,users.getMessages);
+router.get('/users/:id',authScope,users.getOneUser);
+router.post('/users/:account/sessions',users.postSessions);
+router.post('/tel/:tel/code',users.postCode);
+router.del('/users/:account/sessions',authScope,users.deleteSessions);
+router.get('/users/:id/timelines',authScope,users.getTimelines);
+router.get('/users/:id/channels',authScope,users.getChannels);
+router.get('/users/:id/messages',authScope,users.getMessages);
 router.get('/messages/:id',messages.getOneMessage);
 router.post('/bearychat',bearychat.receive);
 

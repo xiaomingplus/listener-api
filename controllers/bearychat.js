@@ -3,7 +3,7 @@ const logger = logger4.getLogger('Bearychat-controllers');
 import axios from 'axios';
 import config from '../../listener-libs/config';
 import {getOneUser} from '../../listener-libs/user';
-module.exports = {
+const bearychat = {
   receive: async(ctx) => {
     logger.info(ctx.request.body);
     const bearychatChannelName = ctx.checkBody('channel_name').notEmpty().value;
@@ -243,3 +243,5 @@ module.exports = {
 
   }
 }
+
+export default bearychat;
