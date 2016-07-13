@@ -73,7 +73,7 @@ router.post('/schools',schools.postSchools);
 router.get('/schools',schools.getSchools);
 router.get('/schools/:id',schools.getOneSchool);
 router.post('/channels',channels.postChannels);
-router.get('/channels/:id',channels.getOneChannel);
+router.get('/channels/:id',auth,channels.getOneChannel);
 router.get("/channels/:id/authorizations",channels.getOneChannelAuthorizations);
 router.get('/channels/:id/messages',channels.getMessages);
 router.post('/channels/:id/subscriptions',auth,channels.postSubscriptions);
