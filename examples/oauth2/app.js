@@ -20,10 +20,10 @@ app.use(bodyParser({
     }
   }
 }));
-const listenerOauth2Url = 'http://192.168.31.172:3001/';
-const listenerApiUrl = 'http://192.168.31.172:3000/';
-const appUrl = 'http://192.168.31.172:3002/';
-const listenerOauth2AuthorizeUrl = 'http://192.168.31.172:8080/';
+const listenerOauth2Url = 'http://oauth2.jiantingzhe.com/';
+const listenerApiUrl = 'http://api.jiantingzhe.com/';
+const appUrl = 'http://example.jiantingzhe.com/';
+const listenerOauth2AuthorizeUrl = 'http://static.jiantingzhe.com/';
 
 router.get('/callback', async(ctx) => {
   if (ctx.query.code) {
