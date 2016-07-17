@@ -24,14 +24,17 @@ const listenerOauth2Url = 'http://oauth2.jiantingzhe.com/';
 const listenerApiUrl = 'http://api.jiantingzhe.com/';
 const appUrl = 'http://example.jiantingzhe.com/';
 const listenerOauth2AuthorizeUrl = 'http://static.jiantingzhe.com/';
+const channel_alias = "test3";
+const channel_id = "37d1bf86-fad9-4185-b88f-1a2960f1718a";
+const channel_token = "b837dabeda255f3d1391340d4dd7a50f3883c7e8503862cbf221b24206991b4b";
 
 router.get('/callback', async(ctx) => {
   if (ctx.query.code) {
     console.log(ctx.query);
     try {
       var authR = await axios.post(`${listenerOauth2Url}oauth2/access_token`, {
-        channel_id: "test3",
-        token: "b837dabeda255f3d1391340d4dd7a50f3883c7e8503862cbf221b24206991b4b",
+        channel_id: channel_alias,
+        token: channel_token,
         code: ctx.query.code
       });
     } catch (e) {
@@ -99,7 +102,7 @@ router.get('/listener/auth', (ctx) =>{
     _redirect +="?back_url="+ctx.query.back_url;
   }
   let redirect_uri = encodeURIComponent(_redirect);
-  let url = `${listenerOauth2AuthorizeUrl}authorize.html?channel_id=59a3a9a6-029c-44c0-8ea0-6c33d5624f29&redirect_uri=${redirect_uri}&scope=user_id_read&response_type=code`;
+  let url = `${listenerOauth2AuthorizeUrl}authorize.html?channel_id=${channel_id}&redirect_uri=${redirect_uri}&scope=user_id_read&response_type=code`;
   ctx.redirect(url);
 });
 app.use(router.routes())
