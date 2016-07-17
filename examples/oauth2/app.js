@@ -35,6 +35,7 @@ router.get('/callback', async(ctx) => {
         code: ctx.query.code
       });
     } catch (e) {
+      console.log(e);
       ctx.body = e.data;
       return;
     }
