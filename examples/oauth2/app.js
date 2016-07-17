@@ -30,8 +30,8 @@ router.get('/callback', async(ctx) => {
     console.log(ctx.query);
     try {
       var authR = await axios.post(`${listenerOauth2Url}oauth2/access_token`, {
-        channel_id: "test",
-        token: "ced86582989314a8ca50468255e02f8bed5850032cca7116bf9408b4f7770f61",
+        channel_id: "test3",
+        token: "b837dabeda255f3d1391340d4dd7a50f3883c7e8503862cbf221b24206991b4b",
         code: ctx.query.code
       });
     } catch (e) {
